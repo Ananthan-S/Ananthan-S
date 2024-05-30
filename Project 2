@@ -1,0 +1,144 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+
+
+const char *ssid =  "sudhar";
+const char *pass =  "0123456789";
+
+#include "DHT.h"
+
+
+#define DHTPIN D3     
+
+#define DHTTYPE DHT11
+
+DHT dht(DHTPIN, DHTTYPE);
+String server ="lace-up-semaphores.000webhostapp.com"; 
+String uri="/bslbatt/read.php";   //to modify
+String data="", s2="";
+WiFiClient client;
+
+#include <LiquidCrystal_I2C.h>//D1, D2 (SCL, SDA)
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+void setup() 
+{
+  Serial.begin(115200);
+  pinMode(D8,OUTPUT);
+  pinMode(D7,OUTPUT);
+  pinMode(D4,OUTPUT);
+  digitalWrite(D7,LOW);
+  digitalWrite(D8,LOW);
+  dht.begin();
+  lcd.begin();
+  lcd.backlight();
+  lcd.print("IOT BASED BMS");
+  lcd.setCursor(0,1);
+  lcd.print(" MONITERING ");
+  delay(2000);
+
+  Serial.println("Connecting to ");
+       Serial.println(ssid);
+ 
+ 
+       WiFi.begin(ssid, pass);
+ 
+      while (WiFi.status() != WL_CONNECTED) 
+     {
+            delay(500);
+            Serial.print(".");
+     }
+      Serial.println("");
+      Serial.println("WiFi connected");
+ 
+}
+
+void loop() 
+{
+float h = dht.readHumidity();
+float t = dht.readTemperature();
+float f = dht.readTemperature(true);
+ int v=analogRead(A0);
+  int mv=map(v,0,1024,1,12);
+ Serial.print("VOLT:");
+ Serial.println(mv);
+ Serial.print("Humi:");
+ Serial.println(h);
+ Serial.print("Temp:");
+ Serial.println(t);
+ lcd.clear();
+ lcd.setCursor(0,0);
+ lcd.print("TEMP  HUMI  VOLT");
+ lcd.setCursor(0,1);
+ lcd.print(t);
+ lcd.setCursor(6,1);
+ lcd.print(h);
+ lcd.setCursor(13,1);
+ lcd.print(mv);
+ delay(1000);
+ if(mv>8)
+ {
+  digitalWrite(D8,HIGH);
+    s2="FULL";
+ }
+ else
+ {
+  digitalWrite(D8,LOW);
+    s2="CHARGE";
+ }
+ if(t>43)
+ {
+  digitalWrite(D7,HIGH);
+  
+ }
+ else
+ {
+  digitalWrite(D7,LOW);
+ }
+ String x;
+//////
+
+data="Field1=" + String(t);// + x; //"&Field2=" + String(digitalRead(D5));
+data=data+"&Field2=" + String(h);
+data=data+"&Field3=" + String(s2);
+if(client.connect(server,80))
+{
+  Serial.println(data);
+String postRequest = "POST " + uri + " HTTP/1.0\r\n" + "Host: " + server + "\r\n" +
+
+"Accept: *" + "/" + "*\r\n" + "Content-Length: " + data.length() + "\r\n" +
+
+"Content-Type: application/x-www-form-urlencoded\r\n" +  "\r\n" + data;
+//Serial.println(postRequest);
+
+client.println(postRequest);
+    while(client.available())
+    {
+      String s1=client.readString();
+    //Serial.println(s1);
+    }
+client.stop();
+
+}
+
+//////
+if (WiFi.status() == WL_CONNECTED) { //Check WiFi connection status
+ Serial.println("get ");
+HTTPClient http;  //Declare an object of class HTTPClient
+
+http.begin(client, "http://lace-up-semaphores.000webhostapp.com/bslbatt/data1.html");
+
+int httpCode = http.GET();                                                                  //Send the request
+ 
+if (httpCode > 0) { //Check the returning code
+ 
+String payload = http.getString();   //Get the request response payload
+//Serial.println(payload);                     //Print the response payload
+Serial.println(payload.charAt(0));
+if(payload.charAt(0)=='0')
+digitalWrite(D4,0);
+else
+digitalWrite(D4,1);
+delay(500);  
+}
+}
+}
